@@ -97,6 +97,33 @@ app.post('/insert', (req, res) => {
   });
 });
 
+// Endpoint to search games by release year
+app.get('/search', (req, res) => {
+  const { release_year } = req.query;
+
+  if (!release_year) {
+    return res.status(400).send('Missing required field: release_year.');
+  }
+
+  // Determine which secondary node to query based on release year
+  const secondaryConnection =
+    release_year < 2010 ? secondaryConnection1 : secondaryConnection2;
+
+  const searchQuery = `
+    SELECT * FROM games WHERE release_year = ?
+  `;
+
+  secondaryConnection.query(searchQuery, [release_year], (err, results) => {
+    if (err) {
+      console.error('Failed to query secondary database:', err.message);
+      return res.status(500).send('Failed to query secondary database.');
+    }
+
+    console.log('Search query executed successfully.');
+    res.json(results);
+  });
+});
+
 // Start the server
 app.listen(port, () => {
   console.log(`Server is running at http://localhost:${port}`);
