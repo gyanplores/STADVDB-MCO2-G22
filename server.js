@@ -14,7 +14,7 @@ const primaryConnection = mysql.createConnection({
   port: 20632,
   user: 'root2',
   password: 'Yq4eAs8gDucEdTwZ6bBKW9Jk',
-  database: 'sys',
+  database: 'stadvdb',
 });
 
 // Server1 and Server2 connections
@@ -23,7 +23,7 @@ const secondaryConnection1 = mysql.createConnection({
   port: 20642,
   user: 'root2',
   password: 'Yq4eAs8gDucEdTwZ6bBKW9Jk',
-  database: 'sys',
+  database: 'stadvdb',
 });
 
 const secondaryConnection2 = mysql.createConnection({
@@ -31,7 +31,7 @@ const secondaryConnection2 = mysql.createConnection({
   port: 20652,
   user: 'root2',
   password: 'Yq4eAs8gDucEdTwZ6bBKW9Jk',
-  database: 'sys',
+  database: 'stadvdb',
 });
 
 // Connect to the primary database

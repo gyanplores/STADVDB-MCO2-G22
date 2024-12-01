@@ -43,6 +43,7 @@
     <button type="submit">Insert</button>
   </form>
   
+  <!-- inserts data to master node and correct slave node -->
   <script>
     document.getElementById('insert-form').addEventListener('submit', function (e) {
       e.preventDefault();
@@ -69,7 +70,7 @@
     });
   </script>
   
-
+  <!-- reads master node for table data -->
   <script>
     fetch('http://localhost:3000/data')
       .then(response => response.json())
