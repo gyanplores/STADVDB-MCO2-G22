@@ -36,6 +36,40 @@
     </tbody>
   </table>
 
+  <form id="insert-form">
+    <input type="number" id="appID" placeholder="App ID" required />
+    <input type="text" id="name" placeholder="Name" required />
+    <input type="number" id="release_year" placeholder="Release Year" required />
+    <button type="submit">Insert</button>
+  </form>
+  
+  <script>
+    document.getElementById('insert-form').addEventListener('submit', function (e) {
+      e.preventDefault();
+  
+      const appID = document.getElementById('appID').value;
+      const name = document.getElementById('name').value;
+      const release_year = document.getElementById('release_year').value;
+  
+      fetch('http://localhost:3000/insert', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ appID, name, release_year }),
+      })
+        .then((response) => {
+          if (response.ok) {
+            alert('Data inserted successfully!');
+          } else {
+            alert('Failed to insert data.');
+          }
+        })
+        .catch((error) => console.error('Error:', error));
+    });
+  </script>
+  
+
   <script>
     fetch('http://localhost:3000/data')
       .then(response => response.json())
