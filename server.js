@@ -82,11 +82,87 @@ function checkConnection(connection, dbName) {
   };
 }
 
-// Use the middleware for all routes that require a database connection
-app.use('/data', checkConnection(primaryConnection, 'Primary Database'));
-app.use('/insert', checkConnection(primaryConnection, 'Primary Database'));
-app.use('/update', checkConnection(primaryConnection, 'Primary Database'));
-app.use('/delete', checkConnection(primaryConnection, 'Primary Database'));
+// For primary connection
+app.use('/data', (req, res, next) => {
+  checkConnection(primaryConnection, 'Primary Database')(req, res, next);
+});
+app.use('/insert', (req, res, next) => {
+  checkConnection(primaryConnection, 'Primary Database')(req, res, next);
+});
+app.use('/update', (req, res, next) => {
+  checkConnection(primaryConnection, 'Primary Database')(req, res, next);
+});
+app.use('/delete', (req, res, next) => {
+  checkConnection(primaryConnection, 'Primary Database')(req, res, next);
+});
+
+// For secondary connection 1
+app.use('/data', (req, res, next) => {
+  const { node } = req.query;
+  if (node === '1') {
+    checkConnection(secondaryConnection1, 'Secondary Database 1')(req, res, next);
+  } else {
+    next();
+  }
+});
+app.use('/insert', (req, res, next) => {
+  const { node } = req.query;
+  if (node === '1') {
+    checkConnection(secondaryConnection1, 'Secondary Database 1')(req, res, next);
+  } else {
+    next();
+  }
+});
+app.use('/update', (req, res, next) => {
+  const { node } = req.query;
+  if (node === '1') {
+    checkConnection(secondaryConnection1, 'Secondary Database 1')(req, res, next);
+  } else {
+    next();
+  }
+});
+app.use('/delete', (req, res, next) => {
+  const { node } = req.query;
+  if (node === '1') {
+    checkConnection(secondaryConnection1, 'Secondary Database 1')(req, res, next);
+  } else {
+    next();
+  }
+});
+
+// For secondary connection 2
+app.use('/data', (req, res, next) => {
+  const { node } = req.query;
+  if (node === '2') {
+    checkConnection(secondaryConnection2, 'Secondary Database 2')(req, res, next);
+  } else {
+    next();
+  }
+});
+app.use('/insert', (req, res, next) => {
+  const { node } = req.query;
+  if (node === '2') {
+    checkConnection(secondaryConnection2, 'Secondary Database 2')(req, res, next);
+  } else {
+    next();
+  }
+});
+app.use('/update', (req, res, next) => {
+  const { node } = req.query;
+  if (node === '2') {
+    checkConnection(secondaryConnection2, 'Secondary Database 2')(req, res, next);
+  } else {
+    next();
+  }
+});
+app.use('/delete', (req, res, next) => {
+  const { node } = req.query;
+  if (node === '2') {
+    checkConnection(secondaryConnection2, 'Secondary Database 2')(req, res, next);
+  } else {
+    next();
+  }
+});
 
 // Endpoint to fetch data (based on node)
 app.get('/data', (req, res) => {
