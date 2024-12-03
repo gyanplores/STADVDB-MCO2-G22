@@ -44,29 +44,49 @@ primaryConnection.connect((err) => {
   console.log('Connected to the primary database.');
 });
 
-// Middleware to handle database errors
-app.use((err, req, res, next) => {
-  if (err.code === 'PROTOCOL_CONNECTION_LOST') {
-    console.error('Database connection was closed.');
-    res.status(500).send('Database connection lost.');
-  } else if (err.code === 'ER_CON_COUNT_ERROR') {
-    console.error('Database has too many connections.');
-    res.status(500).send('Database has too many connections.');
-  } else if (err.code === 'ECONNREFUSED') {
-    console.error('Database connection was refused.');
-    res.status(500).send('Database connection refused.');
-  } else {
-    next(err);
-  }
-});
+// Function to handle reconnections
+function handleDisconnect(connection, dbName) {
+  connection.connect((err) => {
+    if (err) {
+      console.error(`Error connecting to ${dbName}:`, err.message);
+      setTimeout(() => handleDisconnect(connection, dbName), 2000); // Retry connection after 2 seconds
+    } else {
+      console.log(`Connected to ${dbName}`);
+    }
+  });
 
-function ensureConnection(connection, res, callback) {
-  if (!connection || connection.state === 'disconnected') {
-    console.error('Attempted operation on disconnected database.');
-    return res.status(500).send('Database connection lost.');
-  }
-  callback();
+  connection.on('error', (err) => {
+    if (err.code === 'PROTOCOL_CONNECTION_LOST') {
+      console.error(`${dbName} connection lost. Reconnecting...`);
+      handleDisconnect(connection, dbName);
+    } else {
+      console.error(`${dbName} encountered an error:`, err.message);
+    }
+  });
 }
+
+// Reconnect logic for each database
+handleDisconnect(primaryConnection, 'Primary Database');
+handleDisconnect(secondaryConnection1, 'Secondary Database 1');
+handleDisconnect(secondaryConnection2, 'Secondary Database 2');
+
+function checkConnection(connection, dbName) {
+  return (req, res, next) => {
+    connection.ping((err) => {
+      if (err) {
+        console.error(`${dbName} is not connected.`);
+        return res.status(500).send(`${dbName} is not connected. Please try again later.`);
+      }
+      next();
+    });
+  };
+}
+
+// Use the middleware for all routes that require a database connection
+app.use('/data', checkConnection(primaryConnection, 'Primary Database'));
+app.use('/insert', checkConnection(primaryConnection, 'Primary Database'));
+app.use('/update', checkConnection(primaryConnection, 'Primary Database'));
+app.use('/delete', checkConnection(primaryConnection, 'Primary Database'));
 
 // Endpoint to fetch data (based on node)
 app.get('/data', (req, res) => {
@@ -86,15 +106,17 @@ app.get('/data', (req, res) => {
     console.log('Using primary connection');
   }
 
-  ensureConnection(connection, res, () => {
-    const query = 'SELECT * FROM games';
-    connection.query(query, (err, results) => {
-      if (err) {
-        console.error('Database query failed:', err.message);
-        return res.status(500).send('Database query failed.');
-      }
+  checkConnection(connection, `Database Node ${node}`)(req, res, next);
+
+  const query = 'SELECT * FROM games';
+  connection.query(query, (err, results) => {
+    if (err) {
+      console.error('Database query failed:', err.message);
+      res.status(500).send('Database query failed.');
+    } else {
+      console.log('Data fetched successfully:', results);
       res.json(results);
-    });
+    }
   });
 });
 
