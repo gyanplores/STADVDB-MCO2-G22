@@ -44,6 +44,30 @@ primaryConnection.connect((err) => {
   console.log('Connected to the primary database.');
 });
 
+// Middleware to handle database errors
+app.use((err, req, res, next) => {
+  if (err.code === 'PROTOCOL_CONNECTION_LOST') {
+    console.error('Database connection was closed.');
+    res.status(500).send('Database connection lost.');
+  } else if (err.code === 'ER_CON_COUNT_ERROR') {
+    console.error('Database has too many connections.');
+    res.status(500).send('Database has too many connections.');
+  } else if (err.code === 'ECONNREFUSED') {
+    console.error('Database connection was refused.');
+    res.status(500).send('Database connection refused.');
+  } else {
+    next(err);
+  }
+});
+
+function ensureConnection(connection, res, callback) {
+  if (!connection || connection.state === 'disconnected') {
+    console.error('Attempted operation on disconnected database.');
+    return res.status(500).send('Database connection lost.');
+  }
+  callback();
+}
+
 // Endpoint to fetch data (based on node)
 app.get('/data', (req, res) => {
   const { node } = req.query;
@@ -62,15 +86,15 @@ app.get('/data', (req, res) => {
     console.log('Using primary connection');
   }
 
-  const query = 'SELECT * FROM games';
-  connection.query(query, (err, results) => {
-    if (err) {
-      console.error('Database query failed:', err.message);
-      res.status(500).send('Database query failed.');
-    } else {
-      console.log('Data fetched successfully:', results);
+  ensureConnection(connection, res, () => {
+    const query = 'SELECT * FROM games';
+    connection.query(query, (err, results) => {
+      if (err) {
+        console.error('Database query failed:', err.message);
+        return res.status(500).send('Database query failed.');
+      }
       res.json(results);
-    }
+    });
   });
 });
 

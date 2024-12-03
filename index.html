@@ -98,6 +98,37 @@
   </form>
 
   <script>
+    function handleErrors(response) {
+      if (!response.ok) {
+        return response.text().then((message) => {
+          throw new Error(message || 'Unknown error occurred');
+        });
+      }
+      return response.json();
+    }
+    
+    fetch(endpoint)
+      .then(handleErrors)
+      .then((data) => {
+        console.log(`Received data for Node ${node}:`, data);
+        const tableBody = document.querySelector('#data-table tbody');
+        tableBody.innerHTML = '';
+    
+        data.forEach(item => {
+          const row = document.createElement('tr');
+          row.innerHTML = `
+            <td>${item.appID}</td>
+            <td>${item.name}</td>
+            <td>${item.release_year}</td>
+          `;
+          tableBody.appendChild(row);
+        });
+      })
+      .catch((error) => {
+        console.error('Error:', error);
+        alert(`Error: ${error.message}`);
+      });
+    
     const fetchData = (node) => {
       console.log(`Fetching data for Node ${node}`);
 
