@@ -1,6 +1,7 @@
 const express = require('express');
 const mysql = require('mysql2');
 const cors = require('cors');
+const path = require('path');
 
 const app = express();
 const port = 3000;
@@ -161,6 +162,15 @@ app.use('/delete', (req, res, next) => {
     checkConnection(secondaryConnection2, 'Secondary Database 2')(req, res, next);
   } else {
     next();
+  }
+});
+
+app.get('/', async(req, res)=>{
+  try{
+    res.sendFile(path.join(__dirname, 'index.html'));
+  }catch (error){
+    console.error(error);
+    res.status(500).send("Server Error");
   }
 });
 
