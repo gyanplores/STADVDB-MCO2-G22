@@ -1,6 +1,5 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -18,54 +17,151 @@
     th {
       background-color: #f4f4f4;
     }
+    .tab {
+      display: inline-block;
+      padding: 10px 20px;
+      margin-right: 10px;
+      cursor: pointer;
+      background-color: #f0f0f0;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+    }
+    .tab.active {
+      background-color: #007bff;
+      color: white;
+      border-color: #007bff;
+    }
   </style>
 </head>
-
 <body>
   <h1>Data from Database</h1>
-  <table id="data-table">
-    <thead>
-      <tr>
-        <th>App ID</th>
-        <th>Name</th>
-        <th>Release Year</th>
-      </tr>
-    </thead>
-    <tbody>
-      <!-- data will be dynamically inserted here -->
-    </tbody>
-  </table>
 
+  <!-- Tab navigation -->
+  <div>
+    <span class="tab active" data-node="0">Node 0</span>
+    <span class="tab" data-node="1">Node 1</span>
+    <span class="tab" data-node="2">Node 2</span>
+  </div>
 
-  <h3>Insert New Game</h3>
-  <form id="insert-form">
-    <input type="number" id="appID" placeholder="App ID" required />
-    <input type="text" id="name" placeholder="Name" required />
-    <input type="number" id="release_year" placeholder="Release Year" required />
-    <button type="submit">Insert</button>
+  <!-- Main content -->
+  <div id="content">
+    <table id="data-table">
+      <thead>
+        <tr>
+          <th>App ID</th>
+          <th>Name</th>
+          <th>Release Year</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- data will be dynamically inserted here -->
+      </tbody>
+    </table>
+
+    <h3>Insert New Game</h3>
+    <form id="insert-form">
+      <input type="number" id="appID" placeholder="App ID" required />
+      <input type="text" id="name" placeholder="Name" required />
+      <input type="number" id="release_year" placeholder="Release Year" required />
+      <button type="submit">Insert</button>
+    </form>
+
+    <h3>Search Games</h3>
+    <form id="search-by-year-form">
+      <input type="number" id="search_release_year" placeholder="Release Year" required />
+      <button type="submit">Search by Year</button>
+    </form>
+
+    <form id="search-by-app-id-form">
+      <input type="number" id="search_app_id" placeholder="App ID" required />
+      <button type="submit">Search by App ID</button>
+    </form>
+
+    <form id="search-by-name-form">
+      <input type="text" id="search_game_name" placeholder="Game Name" required />
+      <button type="submit">Search by Name</button>
+    </form>
+  </div>
+
+  <h3>Update Game</h3>
+  <form id="update-form">
+    <input type="number" id="update_appID" placeholder="App ID to Update" required />
+    <input type="text" id="update_name" placeholder="New Name" />
+    <input type="number" id="update_release_year" placeholder="New Release Year" />
+    <button type="submit">Update</button>
   </form>
 
-  <h3>Search Games by Year</h3>
-  <form id="search-form">
-    <input type="number" id="release_year" placeholder="Release Year" required />
-    <button type="submit">Search</button>
+  <h3>Delete Game</h3>
+  <form id="delete-form">
+    <input type="number" id="delete_appID" placeholder="App ID to Delete" required />
+    <button type="submit">Delete</button>
   </form>
-  
-  <!-- Inserts data to master node and correct slave node -->
+
   <script>
+    const fetchData = (node) => {
+      console.log(`Fetching data for Node ${node}`);
+
+      const endpoint = node === 0 
+        ? 'http://localhost:3000/data?node=0'
+        : `http://localhost:3000/search?node=${node}`;
+
+      console.log(`Sending request to: ${endpoint}`);
+
+      fetch(endpoint)
+        .then(response => response.json())
+        .then(data => {
+          console.log(`Received data for Node ${node}:`, data);
+          const tableBody = document.querySelector('#data-table tbody');
+          tableBody.innerHTML = '';
+
+          data.forEach(item => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+              <td>${item.appID}</td>
+              <td>${item.name}</td>
+              <td>${item.release_year}</td>
+            `;
+            tableBody.appendChild(row);
+          });
+        })
+        .catch(error => console.error('Error fetching data:', error));
+    };
+
+    // Handle tab switching
+    document.querySelectorAll('.tab').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        
+        const node = parseInt(tab.dataset.node, 10);
+        console.log(`Switched to Node ${node}`);
+        fetchData(node);
+      });
+    });
+
+    // Default load for Node 0
+    fetchData(0);
+
+    // Insert form handler
     document.getElementById('insert-form').addEventListener('submit', function (e) {
       e.preventDefault();
-  
+
       const appID = document.getElementById('appID').value;
       const name = document.getElementById('name').value;
       const release_year = document.getElementById('release_year').value;
-  
+
+      const activeTab = document.querySelector('.tab.active');
+      const node = parseInt(activeTab.dataset.node, 10);
+
+      console.log(`Inserting data for Node ${node}`);
+      console.log(`Inserting: appID=${appID}, name=${name}, release_year=${release_year}`);
+
       fetch('http://localhost:3000/insert', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ appID, name, release_year }),
+        body: JSON.stringify({ appID, name, release_year, node }),
       })
         .then((response) => {
           if (response.ok) {
@@ -76,59 +172,169 @@
         })
         .catch((error) => console.error('Error:', error));
     });
-  </script>
 
-<!-- Handles searches (reads from secondary nodes) -->
-<script>
-  document.getElementById('search-form').addEventListener('submit', function (e) {
-    e.preventDefault();
+    // Search by release year
+    document.getElementById('search-by-year-form').addEventListener('submit', function (e) {
+      e.preventDefault();
 
-    const release_year = document.querySelector('#search-form #release_year').value;
+      const release_year = document.querySelector('#search_release_year').value;
+      const activeTab = document.querySelector('.tab.active');
+      const node = parseInt(activeTab.dataset.node, 10);
 
-    fetch(`http://localhost:3000/search?release_year=${release_year}`)
-      .then((response) => response.json())
-      .then((data) => {
-        const tableBody = document.querySelector('#data-table tbody');
-        tableBody.innerHTML = ''; 
+      console.log(`Searching for games from release year: ${release_year} on Node ${node}`);
 
-        if (data.length === 0) {
-          alert('No results found for the given release year.');
-        } else {
-          data.forEach((item) => {
-            const row = document.createElement('tr');
-            row.innerHTML = `
-              <td>${item.appID}</td>
-              <td>${item.name}</td>
-              <td>${item.release_year}</td>
-            `;
-            tableBody.appendChild(row);
-          });
-        }
+      fetch(`http://localhost:3000/search?release_year=${release_year}&node=${node}`)
+        .then(response => response.json())
+        .then(data => {
+          console.log(`Search results for Node ${node}:`, data);
+          const tableBody = document.querySelector('#data-table tbody');
+          tableBody.innerHTML = '';
+
+          if (data.length === 0) {
+            alert('No results found.');
+          } else {
+            data.forEach(item => {
+              const row = document.createElement('tr');
+              row.innerHTML = `
+                <td>${item.appID}</td>
+                <td>${item.name}</td>
+                <td>${item.release_year}</td>
+              `;
+              tableBody.appendChild(row);
+            });
+          }
+        })
+        .catch(error => console.error('Error fetching search results:', error));
+    });
+
+    // Search by app ID
+    document.getElementById('search-by-app-id-form').addEventListener('submit', function (e) {
+      e.preventDefault();
+
+      const appID = document.querySelector('#search_app_id').value;
+      const activeTab = document.querySelector('.tab.active');
+      const node = parseInt(activeTab.dataset.node, 10);
+
+      console.log(`Searching for game with App ID: ${appID} on Node ${node}`);
+
+      fetch(`http://localhost:3000/search?appID=${appID}&node=${node}`)
+        .then(response => response.json())
+        .then(data => {
+          console.log(`Search results for App ID ${appID} on Node ${node}:`, data);
+          const tableBody = document.querySelector('#data-table tbody');
+          tableBody.innerHTML = '';
+
+          if (data.length === 0) {
+            alert('No results found.');
+          } else {
+            data.forEach(item => {
+              const row = document.createElement('tr');
+              row.innerHTML = `
+                <td>${item.appID}</td>
+                <td>${item.name}</td>
+                <td>${item.release_year}</td>
+              `;
+              tableBody.appendChild(row);
+            });
+          }
+        })
+        .catch(error => console.error('Error fetching search results:', error));
+    });
+
+    // Search by game name
+    document.getElementById('search-by-name-form').addEventListener('submit', function (e) {
+      e.preventDefault();
+
+      const name = document.querySelector('#search_game_name').value;
+      const activeTab = document.querySelector('.tab.active');
+      const node = parseInt(activeTab.dataset.node, 10);
+
+      console.log(`Searching for game with name: ${name} on Node ${node}`);
+
+      fetch(`http://localhost:3000/search?name=${name}&node=${node}`)
+        .then(response => response.json())
+        .then(data => {
+          console.log(`Search results for game name ${name} on Node ${node}:`, data);
+          const tableBody = document.querySelector('#data-table tbody');
+          tableBody.innerHTML = '';
+
+          if (data.length === 0) {
+            alert('No results found.');
+          } else {
+            data.forEach(item => {
+              const row = document.createElement('tr');
+              row.innerHTML = `
+                <td>${item.appID}</td>
+                <td>${item.name}</td>
+                <td>${item.release_year}</td>
+              `;
+              tableBody.appendChild(row);
+            });
+          }
+        })
+        .catch(error => console.error('Error fetching search results:', error));
+    });
+
+    // Update form handler
+    document.getElementById('update-form').addEventListener('submit', function (e) {
+      e.preventDefault();
+
+      const appID = document.getElementById('update_appID').value;
+      const name = document.getElementById('update_name').value;
+      const release_year = document.getElementById('update_release_year').value;
+
+      const activeTab = document.querySelector('.tab.active');
+      const node = parseInt(activeTab.dataset.node, 10);
+
+      console.log(`Updating App ID: ${appID} for Node ${node}`);
+
+      fetch('http://localhost:3000/update', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ appID, name, release_year, node }),
       })
-      .catch((error) => console.error('Error fetching search results:', error));
-  });
-</script>
+        .then((response) => {
+          if (response.ok) {
+            alert('Data updated successfully!');
+            fetchData(node); // Refresh table
+          } else {
+            alert('Failed to update data.');
+          }
+        })
+        .catch((error) => console.error('Error:', error));
+    });
 
-  
-  <!-- reads master node for table data -->
-  <script>
-    fetch('http://localhost:3000/data')
-      .then(response => response.json())
-      .then(data => {
-        const tableBody = document.querySelector('#data-table tbody');
-        data.forEach(item => {
-          const row = document.createElement('tr');
-          row.innerHTML = `
-            <td>${item.appID}</td>
-            <td>${item.name}</td>
-            <td>${item.release_year}</td>
-          `;
-          tableBody.appendChild(row);
-        });
+    // Delete form handler
+    document.getElementById('delete-form').addEventListener('submit', function (e) {
+      e.preventDefault();
+
+      const appID = document.getElementById('delete_appID').value;
+
+      const activeTab = document.querySelector('.tab.active');
+      const node = parseInt(activeTab.dataset.node, 10);
+
+      console.log(`Deleting App ID: ${appID} from Node ${node}`);
+
+      fetch('http://localhost:3000/delete', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ appID, node }),
       })
-      .catch(error => console.error('Error fetching data:', error));
+        .then((response) => {
+          if (response.ok) {
+            alert('Data deleted successfully!');
+            fetchData(node); // Refresh table
+          } else {
+            alert('Failed to delete data.');
+          }
+        })
+        .catch((error) => console.error('Error:', error));
+    });
+
   </script>
-  
 </body>
-
 </html>

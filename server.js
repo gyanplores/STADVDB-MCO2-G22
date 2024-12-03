@@ -17,7 +17,7 @@ const primaryConnection = mysql.createConnection({
   database: 'stadvdb',
 });
 
-// Server1 and Server2 connections
+// Server1 connection
 const secondaryConnection1 = mysql.createConnection({
   host: 'ccscloud.dlsu.edu.ph',
   port: 20642,
@@ -26,6 +26,7 @@ const secondaryConnection1 = mysql.createConnection({
   database: 'stadvdb',
 });
 
+// Server2 connection
 const secondaryConnection2 = mysql.createConnection({
   host: 'ccscloud.dlsu.edu.ph',
   port: 20652,
@@ -43,86 +44,197 @@ primaryConnection.connect((err) => {
   console.log('Connected to the primary database.');
 });
 
-// Endpoint to fetch data
+// Endpoint to fetch data (based on node)
 app.get('/data', (req, res) => {
+  const { node } = req.query;
+  let connection = primaryConnection; // Default to primary connection
+
+  console.log(`Fetching data for Node ${node}`);
+
+  // Select the connection based on the node
+  if (node === '1') {
+    connection = secondaryConnection1;
+    console.log('Using secondary connection 1');
+  } else if (node === '2') {
+    connection = secondaryConnection2;
+    console.log('Using secondary connection 2');
+  } else {
+    console.log('Using primary connection');
+  }
+
   const query = 'SELECT * FROM games';
-  primaryConnection.query(query, (err, results) => {
+  connection.query(query, (err, results) => {
     if (err) {
       console.error('Database query failed:', err.message);
       res.status(500).send('Database query failed.');
     } else {
+      console.log('Data fetched successfully:', results);
       res.json(results);
     }
   });
 });
 
-// Endpoint to insert data
+// Endpoint to insert data (based on node)
 app.post('/insert', (req, res) => {
-  const { appID, name, release_year } = req.body;
+  const { appID, name, release_year, node } = req.body;
 
-  if (!appID || !name || !release_year) {
-    return res.status(400).send('Missing required fields: appID, name, or release_year.');
+  if (!appID || !name || !release_year || node === undefined) {
+    return res.status(400).send('Missing required fields: appID, name, release_year, or node.');
   }
 
-  // Insert into primary node
-  const insertPrimaryQuery = `
+  let connection = primaryConnection; // Default to primary connection
+
+  console.log(`Inserting data for Node ${node}`);
+  console.log(`Inserting: appID=${appID}, name=${name}, release_year=${release_year}`);
+
+  // Select the connection based on the node
+  if (node === 1) {
+    connection = secondaryConnection1;
+    console.log('Using secondary connection 1');
+  } else if (node === 2) {
+    connection = secondaryConnection2;
+    console.log('Using secondary connection 2');
+  } else {
+    console.log('Using primary connection');
+  }
+
+  const insertQuery = `
     INSERT INTO games (appID, name, release_year)
     VALUES (?, ?, ?)
   `;
-  primaryConnection.query(insertPrimaryQuery, [appID, name, release_year], (err) => {
+  connection.query(insertQuery, [appID, name, release_year], (err) => {
     if (err) {
-      console.error('Failed to insert into primary database:', err.message);
-      return res.status(500).send('Failed to insert into primary database.');
+      console.error('Failed to insert into the selected database:', err.message);
+      return res.status(500).send('Failed to insert into the selected database.');
     }
 
-    console.log('Data successfully inserted into primary database.');
-
-    // Determine which secondary node to write to
-    const secondaryConnection =
-      release_year < 2010 ? secondaryConnection1 : secondaryConnection2;
-
-    const insertSecondaryQuery = `
-      INSERT INTO games (appID, name, release_year)
-      VALUES (?, ?, ?)
-    `;
-    secondaryConnection.query(insertSecondaryQuery, [appID, name, release_year], (err) => {
-      if (err) {
-        console.error('Failed to insert into secondary database:', err.message);
-        return res.status(500).send('Failed to insert into secondary database.');
-      }
-
-      console.log('Data successfully replicated to secondary database.');
-      res.status(200).send('Data inserted and replicated successfully.');
-    });
+    console.log('Data successfully inserted into the selected database.');
+    res.status(200).send('Data inserted successfully.');
   });
 });
 
-// Endpoint to search games by release year
+// Endpoint to search games (by year, app ID, or name)
 app.get('/search', (req, res) => {
-  const { release_year } = req.query;
+  const { release_year, appID, name, node } = req.query;
 
-  if (!release_year) {
-    return res.status(400).send('Missing required field: release_year.');
+  let connection = primaryConnection;
+
+  console.log(`Searching with params - Year: ${release_year}, App ID: ${appID}, Name: ${name} on Node ${node}`);
+
+  if (node === '1') {
+    connection = secondaryConnection1;
+    console.log('Using secondary connection 1');
+  } else if (node === '2') {
+    connection = secondaryConnection2;
+    console.log('Using secondary connection 2');
+  } else {
+    console.log('Using primary connection');
   }
 
-  // Determine which secondary node to query based on release year
-  const secondaryConnection =
-    release_year < 2010 ? secondaryConnection1 : secondaryConnection2;
+  let searchQuery = 'SELECT * FROM games WHERE 1=1';
+  const params = [];
 
-  const searchQuery = `
-    SELECT * FROM games WHERE release_year = ?
-  `;
+  if (release_year) {
+    searchQuery += ' AND release_year = ?';
+    params.push(release_year);
+  }
 
-  secondaryConnection.query(searchQuery, [release_year], (err, results) => {
+  if (appID) {
+    searchQuery += ' AND appID = ?';
+    params.push(appID);
+  }
+
+  if (name) {
+    searchQuery += ' AND name LIKE ?';
+    params.push(`%${name}%`);
+  }
+
+  connection.query(searchQuery, params, (err, results) => {
     if (err) {
-      console.error('Failed to query secondary database:', err.message);
-      return res.status(500).send('Failed to query secondary database.');
+      console.error('Failed to query database:', err.message);
+      return res.status(500).send('Failed to query database.');
     }
 
-    console.log('Search query executed successfully.');
     res.json(results);
   });
 });
+
+// Endpoint to update data (based on node)
+app.put('/update', (req, res) => {
+  const { appID, name, release_year, node } = req.body;
+
+  if (!appID || node === undefined) {
+    return res.status(400).send('Missing required fields: appID or node.');
+  }
+
+  let connection = primaryConnection;
+
+  if (node === 1) {
+    connection = secondaryConnection1;
+  } else if (node === 2) {
+    connection = secondaryConnection2;
+  }
+
+  let updateQuery = 'UPDATE games SET';
+  const params = [];
+
+  if (name) {
+    updateQuery += ' name = ?,';
+    params.push(name);
+  }
+  if (release_year) {
+    updateQuery += ' release_year = ?,';
+    params.push(release_year);
+  }
+
+  if (params.length === 0) {
+    return res.status(400).send('No fields provided to update.');
+  }
+
+  updateQuery = updateQuery.slice(0, -1); // Remove trailing comma
+  updateQuery += ' WHERE appID = ?';
+  params.push(appID);
+
+  connection.query(updateQuery, params, (err) => {
+    if (err) {
+      console.error('Failed to update the database:', err.message);
+      return res.status(500).send('Failed to update the database.');
+    }
+
+    res.status(200).send('Data updated successfully.');
+  });
+});
+
+// Endpoint to delete data (based on node)
+app.delete('/delete', (req, res) => {
+  const { appID, node } = req.body;
+
+  if (!appID || node === undefined) {
+    return res.status(400).send('Missing required fields: appID or node.');
+  }
+
+  let connection = primaryConnection;
+
+  if (node === 1) {
+    connection = secondaryConnection1;
+  } else if (node === 2) {
+    connection = secondaryConnection2;
+  }
+
+  const deleteQuery = 'DELETE FROM games WHERE appID = ?';
+
+  console.log(`Deleting App ID ${appID} from Node ${node}`);
+
+  connection.query(deleteQuery, [appID], (err) => {
+    if (err) {
+      console.error('Failed to delete from the database:', err.message);
+      return res.status(500).send('Failed to delete from the database.');
+    }
+
+    res.status(200).send('Data deleted successfully.');
+  });
+});
+
 
 // Start the server
 app.listen(port, () => {
